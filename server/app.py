@@ -71,12 +71,19 @@ class CheckSession(Resource):
       return user_json, 200
     
     return { 'message': 'Unauthorized' }, 401
+  
+class Logout(Resource):
+  def delete(self):
+    session['user_id'] = None
+
+    return {}, 204
 
 api.add_resource(ClearSession, '/clear')
 api.add_resource(IndexArticle, '/articles')
 api.add_resource(ShowArticle, '/articles/<int:id>')
 api.add_resource(Login, '/login')
 api.add_resource(CheckSession, '/check_session')
+api.add_resource(Logout, '/logout')
 
 if __name__ == '__main__':
   app.run(port=5555, debug=True)
