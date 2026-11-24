@@ -54,9 +54,11 @@ class Login(Resource):
     
     user = User.query.filter_by(username=username).first()
     
-    print(user)
+    session['user_id'] = user.id
     
-    return {}, 200
+    user_json = UserSchema().dump(user)
+        
+    return user_json, 200
 
 api.add_resource(ClearSession, '/clear')
 api.add_resource(IndexArticle, '/articles')
