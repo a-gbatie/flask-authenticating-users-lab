@@ -20,37 +20,48 @@ api = Api(app)
 
 class ClearSession(Resource):
 
-    def delete(self):
-    
-        session['page_views'] = None
-        session['user_id'] = None
+  def delete(self):
+  
+    session['page_views'] = None
+    session['user_id'] = None
 
-        return {}, 204
+    return {}, 204
 
 class IndexArticle(Resource):
     
-    def get(self):
-        articles = [ArticlesSchema().dump(article) for article in Article.query.all()]
-        return articles, 200
+  def get(self):
+    articles = [ArticlesSchema().dump(article) for article in Article.query.all()]
+    return articles, 200
 
 class ShowArticle(Resource):
 
-    def get(self, id):
-        session['page_views'] = 0 if not session.get('page_views') else session.get('page_views')
-        session['page_views'] += 1
+  def get(self, id):
+    session['page_views'] = 0 if not session.get('page_views') else session.get('page_views')
+    session['page_views'] += 1
 
-        if session['page_views'] <= 3:
+    if session['page_views'] <= 3:
 
-            article = Article.query.filter(Article.id == id).first()
-            article_json = ArticlesSchema.dump(article)
+      article = Article.query.filter(Article.id == id).first()
+      article_json = ArticlesSchema.dump(article)
 
-            return make_response(article_json, 200)
+      return make_response(article_json, 200)
 
-        return {'message': 'Maximum pageview limit reached'}, 401
+    return {'message': 'Maximum pageview limit reached'}, 401
+  
+class Login(Resource):
+  def post(self):
+    username = request.get_json().get('username')
+    
+    user = User.query.filter_by(username=username).first()
+    
+    print(user)
+    
+    return {}, 200
 
 api.add_resource(ClearSession, '/clear')
 api.add_resource(IndexArticle, '/articles')
 api.add_resource(ShowArticle, '/articles/<int:id>')
+api.add_resource(Login, '/login')
 
 if __name__ == '__main__':
-    app.run(port=5555, debug=True)
+  app.run(port=5555, debug=True)
