@@ -70,7 +70,7 @@ class CheckSession(Resource):
       user_json = UserSchema().dump(user)
       return user_json, 200
     
-    return { 'message': 'Unauthorized' }, 401
+    return {}, 401
   
 class Logout(Resource):
   def delete(self):

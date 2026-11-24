@@ -1,166 +1,327 @@
-# Lab: Authenticating Users
+# Flask Authenticating Users Lab
 
-## Scenario
+## Overview
 
-In this lab, we'll continue working on the blog site from the last lab and set
-up a basic login feature.
+This project implements session-based user authentication in a Flask and React article application. Users can log in using their username, remain logged in across HTTP requests, and log out.
 
-## Tools & Resources
+The purpose of this lab is to understand how Flask sessions can be used to manage user authentication and maintain application state.
 
-- [GitHub Repo](https://github.com/learn-co-curriculum/flask-authenticating-users-lab)
-- [What is Authentication? - auth0](https://auth0.com/intro-to-iam/what-is-authentication)
-- [API - Flask: class flask.session](https://flask.palletsprojects.com/en/2.2.x/api/#flask.session)
+## Learning Objectives
 
-## Set Up
+- Understand session-based authentication.
+- Use Flask-RESTful to create API resources.
+- Retrieve user information from a database.
+- Store and retrieve user IDs using Flask sessions.
+- Maintain authentication across HTTP requests.
+- Implement login, logout, and session verification endpoints.
+- Serialize database objects using Marshmallow.
+- Test authentication functionality using pytest.
 
-There is some starter code in place for a Flask API backend and a React
-frontend. To get set up, run:
+## Technologies Used
+
+- Python 3.10
+- Flask
+- Flask-RESTful
+- Flask-SQLAlchemy
+- Flask-Migrate
+- Marshmallow
+- SQLite
+- Faker
+- React
+- Pipenv
+- pytest
+
+## Features
+
+- Log in using an existing username.
+- Store the authenticated user's ID in a session.
+- Maintain login state across page refreshes.
+- Retrieve authenticated user information.
+- Return a 401 Unauthorized response when no valid user session exists.
+- Log out by resetting the session's user ID.
+- Generate sample users and articles using Faker.
+
+## Installation and Setup
+
+### 1. Clone the Repository
 
 ```bash
-pipenv install && pipenv shell
+git clone git@github.com:a-gbatie/flask-authenticating-users-lab.git
+cd flask-authenticating-users-lab
+```
+
+### 2. Install Backend Dependencies
+
+From the project root directory, run:
+
+```bash
+pipenv install --python 3.10
+pipenv shell
+```
+
+### 3. Install Frontend Dependencies
+
+```bash
 npm install --prefix client
+```
+
+### 4. Set Up the Database
+
+```bash
 cd server
 flask db upgrade
 python seed.py
 ```
 
-You can work on this lab by running the tests with `pytest -x`. It will also be
-helpful to see what's happening during the request/response cycle by running the
-app in the browser. You can run the Flask server with:
+### 5. Start the Flask Backend
+
+From the server directory, run:
 
 ```bash
 python app.py
 ```
 
-And you can run React in another terminal with:
+The backend runs at:
+
+http://localhost:5555
+
+### 6. Start the React Frontend
+
+Open a separate terminal from the project root directory:
 
 ```bash
 npm start --prefix client
 ```
 
-You don't have to make any changes to the React code to get this lab working.
-The React frontend has already defined a proxy in `package.json` as shown:
+## Project Structure
+
+```text
+flask-authenticating-users-lab/
+├── client/
+├── server/
+│   ├── migrations/
+│   ├── testing/
+│   ├── app.py
+│   ├── models.py
+│   └── seed.py
+├── Pipfile
+├── Pipfile.lock
+└── README.md
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| POST | `/login` | Log in using a username |
+| GET | `/check_session` | Retrieve the authenticated user |
+| DELETE | `/logout` | End the user's login session |
+| DELETE | `/clear` | Reset session data |
+| GET | `/articles` | Retrieve all articles |
+| GET | `/articles/<int:id>` | Retrieve an individual article |
+
+## Authentication Implementation
+
+### Login
+
+The Login resource retrieves a user by their username, stores their ID in the session, and returns their serialized information.
+
+```python
+class Login(Resource):
+
+  def post(self):
+    username = request.get_json().get('username')
+
+    user = User.query.filter_by(username=username).first()
+
+    session['user_id'] = user.id
+
+    user_json = UserSchema().dump(user)
+
+    return user_json, 200
+```
+
+Example request:
 
 ```json
-"proxy": "http://localhost:5555",
+{
+  "username": "Michael"
+}
 ```
 
-The proxy avoids CORS issues and allows the server to set a session cookie to
-store the user's login data.
+Example response:
 
-## Instructions
+```json
+{
+  "id": 1,
+  "username": "Michael",
+  "articles": []
+}
+```
 
-### Task 1: Define the Problem
+Status code: `200 OK`
 
-For our basic login feature, we'll need the following functionality:
+### Check Session
 
-- A user can log in by providing their username in a form.
-- A user can log out.
-- A user can remain logged in, even after refreshing the page.
+The CheckSession resource retrieves the stored user ID from the session and checks whether the corresponding user exists in the database.
 
-We'll need to create the resources to handle each of these features.
+```python
+class CheckSession(Resource):
 
-### Task 2: Determine the Design
+  def get(self):
+    user_id = session.get('user_id')
 
-We'll need to build the following resources:
+    user = User.query.filter_by(id=user_id).first()
 
-- `Login` is located at `/login`.
+    if user:
+      user_json = UserSchema().dump(user)
+      return user_json, 200
 
-  - It has one route, `post()`.
-  - `post()` gets a `username` from `request`'s JSON.
-  - `post()` retrieves the user by `username` (we made these unique for you).
-  - `post()` sets the session's `user_id` value to the user's `id`.
-  - `post()` returns the user as JSON with a 200 status code.
+    return {'message': 'Unauthorized'}, 401
+```
 
-- `Logout` is located at `/logout`.
+If the user is authenticated, the endpoint returns their information with a `200 OK` response.
 
-  - It has one route, `delete()`.
-  - `delete()` removes the `user_id` value from the session.
-  - `delete()` returns no data and a 204 (No Content) status code.
+If no valid user session exists, the endpoint returns an empty object and `401 Unauthorized`:
 
-- `CheckSession` is located at `/check_session`.
-  - It has one route, `get()`.
-  - `get()` retrieves the `user_id` value from the session.
-  - If the session has a `user_id`, `get()` returns the user as JSON with a 200
-    status code.
-  - If the session does not have a `user_id`, `get()` returns no data and a 401
-    (Unauthorized) status code.
+```json
+{}
+```
 
-### Task 3: Develop, Test, and Refine the Code
+Status code: `401 Unauthorized`
 
-#### Step 1: Create Routes
+### Logout
 
-- /login, post()
-  - should handle the request to get username
-  - find User in database by username. We'll need the id for the next step.
-- /delete, delete()
-- /check_session, get()
+The Logout resource resets the stored user ID, ending the user's login session without deleting their database record.
 
-#### Step 2: Initialize, Retrieve, and/or Update Session
+```python
+class Logout(Resource):
 
-- Session: /login post()
-  - set session['user_id'] to the found user's id
-- Session: /logout delete()
-  - remove the value for session['user_id']
-- Session: /check_session get()
-  - get current value of session['user_id'] (it may not exist)
+  def delete(self):
+    session['user_id'] = None
 
-#### Step 3: Return the Response
+    return {}, 204
+```
 
-- Session: /login post()
-  - return user as JSON with a 200 status code
-- Session: /logout delete()
-  - returns no data and a 204 (No Content) status code
-- Session: /check_session get()
-  - If the session has a `user_id`, `get()` returns the user as JSON with a 200
-    status code.
-  - If the session does not have a `user_id`, `get()` returns no data and a 401
-    (Unauthorized) status code.
+Status code: `204 No Content`
 
-The tests are not looking for invalid users for /login, but if you have extra time, consider what response you should send if a user is not found with the given username.
+### Resource Registration
 
-#### Step 4: Test and Refine the Code
+The authentication resources are registered using Flask-RESTful.
 
-Run the test suite:
+```python
+api.add_resource(Login, '/login')
+api.add_resource(CheckSession, '/check_session')
+api.add_resource(Logout, '/logout')
+```
+
+## Authentication Workflow
+
+1. The client sends a POST request containing a username.
+2. Flask searches the database for the corresponding user.
+3. The user's ID is stored in the session.
+4. Flask returns the user's serialized information.
+5. The browser stores the session cookie.
+6. Subsequent requests include the session cookie.
+7. The CheckSession resource retrieves the authenticated user.
+8. When the user logs out, the stored user ID is reset.
+
+## HTTP Status Codes
+
+| Status Code | Meaning | Usage |
+| ----------- | ------- | ----- |
+| 200 | OK | Successful login or session verification |
+| 204 | No Content | Successful logout |
+| 401 | Unauthorized | No valid authenticated user session |
+
+## Testing
+
+### Automated Testing
+
+From the project root directory, run:
 
 ```bash
-pytest
+pipenv run python -m pytest -v
 ```
 
-If any tests aren't passing, refine your code using each error message.
+The automated tests verify the required authentication functionality, including login, session persistence, session verification, and logout.
 
-View the app in browser and test login, logout, and session persistence. Refine code if needed.
+### Manual Testing
 
-Feel free to also take a look at how the frontend logic is set up to use these endpoints.
+#### Find an Existing Username
 
-#### Step 5: Commit and Push Git History
-
-* Commit and push your code:
+From the server directory, open the Flask shell:
 
 ```bash
-git add .
-git commit -m "final solution"
-git push
+pipenv run flask --app app.py shell
 ```
 
-* If you created a separate feature branch, remember to open a PR on main and merge.
+Retrieve the available users:
 
-### Task 4: Document and Maintain
+```python
+from models import User
 
-Best Practice documentation steps:
-* Add comments to the code to explain purpose and logic, clarifying intent and functionality of your code to other developers.
-* Update README text to reflect the functionality of the application following https://makeareadme.com. 
-  * Add screenshot of completed work included in Markdown in README.
-* Delete any stale branches on GitHub
-* Remove unnecessary/commented out code
-* If needed, update git ignore to remove sensitive data
+users = User.query.all()
 
-## Important Submission Note
+for user in users:
+  print(user.id, user.username)
+```
 
-Before you submit your solution, you need to save your progress with git.
+Exit the Flask shell:
 
-1. Add your changes to the staging area by executing `git add .`.
-2. Create a commit by executing `git commit -m "Your commit message"`.
-3. Push your commits to GitHub by executing `git push origin main`.
+```python
+exit()
+```
 
-CodeGrade will grade your lab using the same tests as are provided in the `testing/` directory.
+#### Test Login
+
+With the Flask server running, send a POST request:
+
+```bash
+curl -i -c cookies.txt -X POST http://localhost:5555/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "Michael"}'
+```
+
+Replace `Michael` with an existing username from the database.
+
+Expected result: `200 OK` with user information and a session cookie.
+
+#### Test Session Verification
+
+```bash
+curl -i -b cookies.txt http://localhost:5555/check_session
+```
+
+Expected result: `200 OK` with the authenticated user's information.
+
+#### Test Unauthenticated Access
+
+```bash
+curl -i http://localhost:5555/check_session
+```
+
+Expected result: `401 Unauthorized`.
+
+#### Test Logout
+
+```bash
+curl -i -b cookies.txt -c cookies.txt \
+  -X DELETE http://localhost:5555/logout
+```
+
+Expected result: `204 No Content`.
+
+#### Verify Logout
+
+```bash
+curl -i -b cookies.txt http://localhost:5555/check_session
+```
+
+Expected result: `401 Unauthorized`.
+
+Do not commit the generated `cookies.txt` file to version control.
+
+## Screenshot of Completed Tests
+
+![3 Automated Tests Passing](image.png)
